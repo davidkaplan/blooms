@@ -1,6 +1,6 @@
 # README #
 
-A Maya to procedurally generate John Edmark's golden-ratio inspired zoetrope geometries.
+A Maya script to procedurally generate John Edmark's golden-ratio inspired zoetrope geometries.
 
 ### Configuring Your PYTHONPATH ###
 
