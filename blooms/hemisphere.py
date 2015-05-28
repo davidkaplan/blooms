@@ -13,13 +13,14 @@ def run():
     settings = pm.group(empty=True, name='settings', )
     pm.addAttr(settings, longName='delta_height', defaultValue=0.25, minValue=0.05, maxValue=1)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
-    pm.addAttr(settings, longName='numPoints', defaultValue=50, minValue=20, maxValue=500, attributeType='byte')
+    pm.addAttr(settings, longName='numPoints', defaultValue=300, minValue=20, maxValue=500, attributeType='long')
     pm.addAttr(settings, longName='start_angle', defaultValue=0, minValue=-85, maxValue=85, attributeType='double')
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
-    pm.expression(settings, s='%s = %d * tan(%s * 3.1459/180)' % (settings.start_height, 1, settings.start_angle))
+    pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
 
     # Seed object
     seed = pm.polyPyramid(name='seedObj')
+    seed[0].rotateY.set(45)
 
     # Group locators
     loc_group = pm.group(empty=True, name='group_locators')
@@ -40,12 +41,12 @@ def run():
 
             # Set up rotation equations
             grp = pm.group(empty=True, name='group_%i' % i)
-            pm.addAttr(longName='index', attributeType='byte', defaultValue=i)
+            pm.addAttr(longName='index', attributeType='long', defaultValue=i)
             grp.setAttr('index', lock=True)
             grp.setRotationOrder('XZY', True)
             grp.rotateX.lock()
             grp.translate.lock()
-            pm.expression(grp, s='%s.rotateZ = 180*atan(%s + %i*%s/%i)/3.1459' % (grp.nodeName(), settings.start_height, i, settings.delta_height, r))
+            pm.expression(grp, s='%s.rotateZ = 180*atan((%s + %i*%s)/%i)/%d' % (grp.nodeName(), settings.start_height, i, settings.delta_height, r, math.pi))
             pm.expression(grp, s='%s.rotateY = %i*%s' % (grp.nodeName(), i, settings.delta_theta))
             pm.parent(grp, loc_group)
 
@@ -96,7 +97,7 @@ def run():
     total = n - (nodes[0] + nodes[1])
 
     lattices = []
-    #group_lattices = pm.group(empty=True, name='group_lattices')
+    group_lattices = pm.group(empty=True, name='group_lattices')
 
     for group, loc_inner, loc_outer in points[:-sum(nodes)]:
         index = group.getAttr('index')
@@ -104,6 +105,8 @@ def run():
         # Lattice
         pm.select(clear=True)
         lat, latxform, latbasexform = pm.lattice(dv=(2,2,2), objectCentered=True, outsideLattice=1)
+        pm.parent([latxform, latbasexform], group_lattices)
+        lattices.append({'ffd': lat, 'xform': latxform, 'base':latbasexform})
         latxform.scale.set([1,1,1])
         latbasexform.scale.set([1,1,1])
 
@@ -138,42 +141,18 @@ def run():
         pm.cluster(clusters[index+nodes[1]]['outer']['handle'], edit=True, g=top_left_outer)
         pm.cluster(clusters[index+sum(nodes)]['outer']['handle'], edit=True, g=top_right_outer)
 
-        #cluster = pm.cluster(bot_left_inner)
-        #print cluster
-        #print loc_inner, loc_outer
-        #pm.parent(cluster[1], loc_inner, relative = True)
+    group_geom = pm.group(empty=True, name='group_geom')
 
-        #break
-        # sel_list = pm.selected()
-        # sel_xform = sel_list[0]
-        # sel_shapes = sel_xform.listRelatives(shapes=True)
-        # sel_shape = sel_shapes[0]
-        # lat, latxform, latbasexform = pm.lattice(sel_shape, dv=(2,2,2), objectCentered=True, outsideLattice=1)
-        # latxform.scale.set([1,1,1])
-        # latbasexform.scale.set([1,1,1])
-
-        # point1 = latxform.pt[0][0][0]
-        # pm.listAttr(point1)
-        # cluster1 = pm.cluster(point1)
+    for lattice in lattices:
+        newseed = pm.instance(seed)[0]
+        #pm.parent(newseed, group_geom)
+        pm.lattice(lattice['ffd'], e=True, g=newseed, split=True)
+        seed[0].rotate.connect(newseed.rotate)
+        seed[0].scale.connect(newseed.scale)
 
 
     pm.undoInfo(state=True)
     pm.select(settings)
 
 
-# sel_list = pm.selected()
-# sel_xform = sel_list[0]
-# sel_shapes = sel_xform.listRelatives(shapes=True)
-# sel_shape = sel_shapes[0]
-# lat, latxform, latbasexform = pm.lattice(sel_shape, dv=(2,2,2), objectCentered=True, outsideLattice=1)
-# latxform.scale.set([1,1,1])
-# latbasexform.scale.set([1,1,1])
-# point1 = latxform.pt[0][0][0]
-# pm.listAttr(point1)
-# cluster1 = pm.cluster(point1)
 
-# locator1 = pm.spaceLocator(name='loc1', position=[5,0,0])
-# locator1.setRotatePivot([0,0,0])
-# locator1.setRotationOrder('XZY', True)
-# locator1.rotateOrder.set(1)
-# locator1.rotate.set([0, 40, 20])
