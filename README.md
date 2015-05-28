@@ -20,7 +20,7 @@ In order for Maya to find this python script, you must add its location to your 
 ```
 
 
-* In Maya, you can now create a shelf button to run the script:
+* In Maya, you can now create a shelf button to run the script (or just run it in the script editor):
 
 ```
     import blooms.hemisphere
