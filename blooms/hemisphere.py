@@ -7,6 +7,7 @@ def run():
     pm.select(allDagObjects=True)
     if pm.selected():
         pm.delete()
+    [pm.delete(l) for l in pm.ls(type='displayLayer')[:-1]]
 
     # Make settings
     r = 20
@@ -145,11 +146,20 @@ def run():
 
     for lattice in lattices:
         newseed = pm.instance(seed)[0]
-        #pm.parent(newseed, group_geom)
         pm.lattice(lattice['ffd'], e=True, g=newseed, split=True)
         seed[0].rotate.connect(newseed.rotate)
         seed[0].scale.connect(newseed.scale)
+        pm.parent(newseed, group_geom)
 
+    # Display layers
+    layerGeom = pm.createDisplayLayer(empty=True, name='Geometry').addMembers(group_geom)
+    layerLattices = pm.createDisplayLayer(empty=True, name='Lattices').addMembers(group_lattices)
+    layerLocators = pm.createDisplayLayer(empty=True, name='Locators').addMembers(loc_group)
+
+    # Animate it
+    pm.setKeyframe(loc_group, attribute='rotateY', time=0, value=0, inTangentType='linear', outTangentType='linear')
+    pm.setKeyframe(loc_group, attribute='rotateY', time=1, value=137.5, inTangentType='linear', outTangentType='linear')
+    pm.setInfinity(loc_group, attribute='rotateY', preInfinite='cycleRelative', postInfinite='cycleRelative')
 
     pm.undoInfo(state=True)
     pm.select(settings)
