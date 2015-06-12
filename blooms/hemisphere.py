@@ -10,11 +10,12 @@ def run():
     [pm.delete(l) for l in pm.ls(type='displayLayer')[:-1]]
 
     # Make settings
+    nodes = [8, 13]
     r = 20
     settings = pm.group(empty=True, name='settings', )
     pm.addAttr(settings, longName='delta_height', defaultValue=0.25, minValue=0.05, maxValue=1)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
-    pm.addAttr(settings, longName='numPoints', defaultValue=300, minValue=20, maxValue=500, attributeType='long')
+    pm.addAttr(settings, longName='numPoints', defaultValue=200, minValue=20, maxValue=500, attributeType='long')
     pm.addAttr(settings, longName='start_angle', defaultValue=0, minValue=-85, maxValue=85, attributeType='double')
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
     pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
@@ -33,8 +34,10 @@ def run():
     pm.undoInfo(state=False)
 
     # Do loop
-    pm.progressWindow(title='Creating Bloom', progress=0, status='calculating...', isInterruptable=True )
+    progress = 0
+    pm.progressWindow(title='Creating Bloom', progress=progress, status='Creating Locators...', isInterruptable=True )
     n = settings.numPoints.get()
+    progressTotal = 2*n + 2*(n - sum(nodes))
     try:
         for i in range(n):
             if pm.progressWindow( query=True, isCancelled=True ) :
@@ -66,19 +69,19 @@ def run():
             points.append([grp, loc_inner, loc_outer])
 
             # Update progress
-            pm.progressWindow( edit=True, progress=100*i/n)
+            progress += 1
+            pm.progressWindow( edit=True, progress=100*progress/progressTotal)
 
     except Exception, e:
         print 'Error', e
-
-
-    pm.progressWindow(endProgress=1)
 
     # Construct clusters
     clusters = []
     #group_clusters = pm.group(empty=True, name='group_clusters')
 
     for locator_group in loc_group.listRelatives(children=True, type='transform'):
+        if pm.progressWindow( query=True, isCancelled=True ) :
+            break
         index = locator_group.getAttr('index')
         inner = locator_group.listRelatives(children=True, type='transform')[0]
         outer = inner.listRelatives(children=True, type='transform')[0]
@@ -93,14 +96,19 @@ def run():
 
         clusters.append({'inner':{'xform': cluster_inner_transform, 'handle': cluster_inner_handle}, 'outer':{'xform': cluster_outer_transform, 'handle':cluster_outer_handle}})
 
+        progress += 1
+        pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Creating Clusters...')
+
     # Lattices
-    nodes = [8, 13]
     total = n - (nodes[0] + nodes[1])
 
     lattices = []
     group_lattices = pm.group(empty=True, name='group_lattices')
 
     for group, loc_inner, loc_outer in points[:-sum(nodes)]:
+        if pm.progressWindow( query=True, isCancelled=True ) :
+            break
+
         index = group.getAttr('index')
 
         # Lattice
@@ -142,14 +150,24 @@ def run():
         pm.cluster(clusters[index+nodes[1]]['outer']['handle'], edit=True, g=top_left_outer)
         pm.cluster(clusters[index+sum(nodes)]['outer']['handle'], edit=True, g=top_right_outer)
 
+        progress += 1
+        pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Creating Lattices...')
+
     group_geom = pm.group(empty=True, name='group_geom')
 
     for lattice in lattices:
+        if pm.progressWindow( query=True, isCancelled=True ) :
+            break
         newseed = pm.instance(seed)[0]
         pm.lattice(lattice['ffd'], e=True, g=newseed, split=True)
         seed[0].rotate.connect(newseed.rotate)
         seed[0].scale.connect(newseed.scale)
         pm.parent(newseed, group_geom)
+
+        progress += 1
+        pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Instancing Geometry...')
+
+    pm.progressWindow( edit=True, progress=99, status='Finishing Up...', )
 
     # Display layers
     layerGeom = pm.createDisplayLayer(empty=True, name='Geometry').addMembers(group_geom)
@@ -163,6 +181,9 @@ def run():
 
     pm.undoInfo(state=True)
     pm.select(settings)
+
+    pm.progressWindow(endProgress=True)
+
 
 
 
