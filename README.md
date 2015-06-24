@@ -16,7 +16,7 @@ In order for Maya to find this python script, you must add its location to your 
 
 ```
     import sys
-    sys.path.append('<location of cloned repository>')
+    sys.path.append("<location of cloned repository>")
 ```
 
 
