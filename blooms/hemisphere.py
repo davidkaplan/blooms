@@ -190,8 +190,9 @@ def run():
 
     # Animate it
     pm.setKeyframe(loc_group, attribute='rotateY', time=0, value=0, inTangentType='linear', outTangentType='linear')
-    pm.setKeyframe(loc_group, attribute='rotateY', time=1, value=137.5, inTangentType='linear', outTangentType='linear')
+    pm.setKeyframe(loc_group, attribute='rotateY', time=1, value=137.647, inTangentType='linear', outTangentType='linear')
     pm.setInfinity(loc_group, attribute='rotateY', preInfinite='cycleRelative', postInfinite='cycleRelative')
+    pm.playbackOptions(edit=True, animationEndTime='34')
 
     pm.undoInfo(state=True)
     pm.select(settings)
