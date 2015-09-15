@@ -50,7 +50,6 @@ def run():
             grp.setRotationOrder('XZY', True)
             grp.rotateX.lock()
             grp.translate.lock()
-            pm.expression(grp, s='%s.rotateZ = 180*atan((%s + %i*%s)/%i)/%d' % (grp.nodeName(), settings.start_height, i, settings.delta_height, r, math.pi))
             pm.expression(grp, s='%s.rotateY = %i*%s' % (grp.nodeName(), i, settings.delta_theta))
             pm.parent(grp, loc_group)
 
@@ -74,6 +73,21 @@ def run():
 
     except Exception, e:
         print 'Error', e
+
+    def setPhiLocators():
+        theta = settings.start_angle.get()
+        for grp, loc_inner, loc_outer in points:
+            # This Point
+            grp.rotateZ.set(theta)
+            x, y, z = pm.xform(loc_inner, query=True, worldSpace=True, translation=True)
+            # Next Point
+            h_prime = y + settings.delta_height.get()
+            r_prime = math.sqrt(x**2 + z**2)
+            theta = math.degrees(math.atan(h_prime/r_prime))
+
+    setPhiLocators()
+    pm.scriptJob(attributeChange=['settings.delta_height', setPhiLocators])
+    pm.scriptJob(attributeChange=['settings.start_angle', setPhiLocators])
 
     # Construct clusters
     clusters = []
@@ -176,8 +190,9 @@ def run():
 
     # Animate it
     pm.setKeyframe(loc_group, attribute='rotateY', time=0, value=0, inTangentType='linear', outTangentType='linear')
-    pm.setKeyframe(loc_group, attribute='rotateY', time=1, value=137.5, inTangentType='linear', outTangentType='linear')
+    pm.setKeyframe(loc_group, attribute='rotateY', time=1, value=137.647, inTangentType='linear', outTangentType='linear')
     pm.setInfinity(loc_group, attribute='rotateY', preInfinite='cycleRelative', postInfinite='cycleRelative')
+    pm.playbackOptions(edit=True, animationEndTime='34')
 
     pm.undoInfo(state=True)
     pm.select(settings)
