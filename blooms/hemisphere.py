@@ -15,7 +15,7 @@ def run():
     settings = pm.group(empty=True, name='settings', )
     pm.addAttr(settings, longName='delta_height', defaultValue=0.25, minValue=0.05, maxValue=1)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
-    pm.addAttr(settings, longName='numPoints', defaultValue=300, minValue=20, maxValue=500, attributeType='long')
+    pm.addAttr(settings, longName='numPoints', defaultValue=200, minValue=20, maxValue=500, attributeType='long')
     pm.addAttr(settings, longName='start_angle', defaultValue=0, minValue=-85, maxValue=85, attributeType='double')
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
     pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
