@@ -3,26 +3,42 @@ import pymel.core as pm
 
 
 def run():
-    # Clear scene
-    pm.select(allDagObjects=True)
-    if pm.selected():
-        pm.delete()
+    # Get Selected Objects
+    if not pm.ls(selection=True):
+        pm.error("No Object selected in the scene. Please select an object and try again.")
+    objs = pm.ls(selection=True, type='mesh', dag=True, allPaths=True, noIntermediate=True)
+    if not objs:
+        pm.error("No geometry object to operate on. Please select and try again.")
+    if len(objs) > 1:
+        pm.error("Please select only 1 object.")
+    seed = objs[0]
+    
+    # Get rid of display layers
     [pm.delete(l) for l in pm.ls(type='displayLayer')[:-1]]
 
-    # Make settings
+    # Hardcoded Values
     nodes = [8, 13]
     r = 20
+    n = 200
+    
+    # Make Settings
     settings = pm.group(empty=True, name='settings', )
     pm.addAttr(settings, longName='delta_height', defaultValue=0.25, minValue=0.05, maxValue=1)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
-    pm.addAttr(settings, longName='numPoints', defaultValue=200, minValue=20, maxValue=500, attributeType='long')
     pm.addAttr(settings, longName='start_angle', defaultValue=0, minValue=-85, maxValue=85, attributeType='double')
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
     pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
 
-    # Seed object
-    seed = pm.polyPyramid(name='seedObj')
-    seed[0].rotateY.set(45)
+    # Make the snapshots
+    group_snap = pm.group(empty=True, name='group_snapshots')
+    snapshots = []
+    for i in range(1, n+1):
+        geomVarGroup, motionTrail = pm.snapshot(seed, constructionHistory=True, startTime=i, endTime=i)
+        snapshots.append(geomVarGroup)
+        pm.parent(geomVarGroup, group_snap)
+        
+    #pm.error()
+        
 
     # Group locators
     loc_group = pm.group(empty=True, name='group_locators')
@@ -36,7 +52,6 @@ def run():
     # Do loop
     progress = 0
     pm.progressWindow(title='Creating Bloom', progress=progress, status='Creating Locators...', isInterruptable=True )
-    n = settings.numPoints.get()
     progressTotal = 2*n + 2*(n - sum(nodes))
     try:
         for i in range(n):
@@ -168,14 +183,13 @@ def run():
         pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Creating Lattices...')
 
     group_geom = pm.group(empty=True, name='group_geom')
-
-    for lattice in lattices:
+ 
+    for i, lattice in enumerate(lattices):
         if pm.progressWindow( query=True, isCancelled=True ) :
             break
-        newseed = pm.instance(seed)[0]
+        #newseed = pm.instance(seed)[0]
+        newseed = snapshots[i]
         pm.lattice(lattice['ffd'], e=True, g=newseed, split=True)
-        seed[0].rotate.connect(newseed.rotate)
-        seed[0].scale.connect(newseed.scale)
         pm.parent(newseed, group_geom)
 
         progress += 1
