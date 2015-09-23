@@ -17,20 +17,21 @@ def run():
     [pm.delete(l) for l in pm.ls(type='displayLayer')[:-1]]
 
     # Hardcoded Values
-    nodes = [8, 13]
+    nodes = [13, 21]
     r = 20
-    n = 50
+    n = 80
     thickness = 10
     # period of petal animation
-    p = 72
+    p = 60
     
     #turn off history
     pm.undoInfo(state=False)
     
     # Make Settings
     settings = pm.group(empty=True, name='settings', )
-    pm.addAttr(settings, longName='delta_height', defaultValue=0.25, minValue=0.05, maxValue=1)
+    pm.addAttr(settings, longName='delta_height', defaultValue=0.2, minValue=0.05, maxValue=1)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
+    pm.addAttr(settings, longName='thickness', defaultValue=5, minValue=0.5, maxValue=50)
     pm.addAttr(settings, longName='start_angle', defaultValue=0, minValue=-85, maxValue=85, attributeType='double')
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
     pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
@@ -42,6 +43,7 @@ def run():
         geomVarGroup, motionTrail = pm.snapshot(seed, constructionHistory=True, startTime=i, endTime=i, update='always')
         child = pm.listRelatives(geomVarGroup, children=True)[0]
         snapshots.append({'child':child, 'geomVarGroup':geomVarGroup})
+        pm.parent(geomVarGroup, group_snap)
 
     # Group locators
     loc_group = pm.group(empty=True, name='group_locators')
@@ -78,7 +80,7 @@ def run():
             # Outer locator
             loc_outer = pm.spaceLocator(name='loc_%i_outer' % i)
             pm.parent(loc_outer, loc_inner, relative=True)
-            pm.expression(loc_outer, s='%s.translateX = %d * (1 - %s / 90)' % (loc_outer.nodeName(), thickness, grp.rotateZ))
+            pm.expression(loc_outer, s='%s.translateX = %s * (1 - %s / 90)' % (loc_outer.nodeName(), settings.thickness, grp.rotateZ))
 
             # Keep track of objects
             points.append([grp, loc_inner, loc_outer])
@@ -188,24 +190,51 @@ def run():
         pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Creating Lattices...')
 
     group_geom = pm.group(empty=True, name='group_geom')
-
     for i, lattice in enumerate(reversed(lattices)):
-        print "FOO", i
         if pm.progressWindow( query=True, isCancelled=True ):
             pm.undoInfo(state=True)
             pm.progressWindow(endProgress=True)
             break
+
+        loop_num = i/p
         
         frame1 = i % p
         frame2 = (i + p/2) % p
-        print "frame", frame1, frame2
         
-        petal1_1 = pm.instance(snapshots[frame1]['child'])[0]
-        petal1_2 = pm.instance(snapshots[frame1]['child'])[0]
+        #print "FRAME", i, frame1, frame2
+        
+        petal1_1 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
+        petal1_2 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
+        petal1_3 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
+        
+        petal2_1 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
+        petal2_2 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
+        petal2_3 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
+        
         pm.parent(petal1_1, world=True)
         pm.parent(petal1_2, world=True)
-        pm.lattice(lattice['ffd'], e=True, g=[petal1_1, petal1_2], after=True)
+        pm.parent(petal1_3, world=True)
+        
+        pm.parent(petal2_1, world=True)
+        pm.parent(petal2_2, world=True)
+        pm.parent(petal2_3, world=True)
+        
+        petals = [petal1_1, petal1_2, petal1_3, petal2_1, petal2_2, petal2_3]
+        pm.lattice(lattice['ffd'], e=True, g=petals, after=True)
+        
         petal1_2.rotateY.set(120)
+        petal1_3.rotateY.set(240)
+        
+        petal2_2.rotateY.set(120)
+        petal2_3.rotateY.set(240)
+        
+        pm.parent(petal1_1, group_geom)
+        pm.parent(petal1_2, group_geom)
+        pm.parent(petal1_3, group_geom)
+        
+        pm.parent(petal2_1, group_geom)
+        pm.parent(petal2_2, group_geom)
+        pm.parent(petal2_3, group_geom)
         
         progress += 1
         pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Instancing Geometry...')
