@@ -19,10 +19,9 @@ def run():
     # Hardcoded Values
     nodes = [13, 21]
     r = 20
-    n = 80
-    thickness = 10
+    n = 300
     # period of petal animation
-    p = 60
+    p = n
     
     #turn off history
     pm.undoInfo(state=False)
@@ -31,7 +30,8 @@ def run():
     settings = pm.group(empty=True, name='settings', )
     pm.addAttr(settings, longName='delta_height', defaultValue=0.2, minValue=0.05, maxValue=1)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
-    pm.addAttr(settings, longName='thickness', defaultValue=5, minValue=0.5, maxValue=50)
+    pm.addAttr(settings, longName='thickness', defaultValue=1, minValue=0, maxValue=10)
+    pm.addAttr(settings, longName='thickness_growth', defaultValue=0, minValue=-10, maxValue=10)
     pm.addAttr(settings, longName='start_angle', defaultValue=0, minValue=-85, maxValue=85, attributeType='double')
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
     pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
@@ -40,7 +40,7 @@ def run():
     group_snap = pm.group(empty=True, name='group_snapshots')
     snapshots = []
     for i in range(1, p+1):
-        geomVarGroup, motionTrail = pm.snapshot(seed, constructionHistory=True, startTime=i, endTime=i, update='always')
+        geomVarGroup, motionTrail = pm.snapshot(seed, constructionHistory=True, startTime=i, endTime=i, update='animCurve')
         child = pm.listRelatives(geomVarGroup, children=True)[0]
         snapshots.append({'child':child, 'geomVarGroup':geomVarGroup})
         pm.parent(geomVarGroup, group_snap)
@@ -80,7 +80,7 @@ def run():
             # Outer locator
             loc_outer = pm.spaceLocator(name='loc_%i_outer' % i)
             pm.parent(loc_outer, loc_inner, relative=True)
-            pm.expression(loc_outer, s='%s.translateX = %s * (1 - %s / 90)' % (loc_outer.nodeName(), settings.thickness, grp.rotateZ))
+            #pm.expression(loc_outer, s='%s.translateX = %s * (1 - %s / 90)' % (loc_outer.nodeName(), settings.thickness, grp.rotateZ))
 
             # Keep track of objects
             points.append([grp, loc_inner, loc_outer])
@@ -94,7 +94,9 @@ def run():
 
     def setPhiLocators():
         theta = settings.start_angle.get()
-        for grp, loc_inner, loc_outer in points:
+        total_pts = len(points)
+        for i, pts in enumerate(points):
+            grp, loc_inner, loc_outer = pts
             # This Point
             grp.rotateZ.set(theta)
             x, y, z = pm.xform(loc_inner, query=True, worldSpace=True, translation=True)
@@ -102,10 +104,19 @@ def run():
             h_prime = y + settings.delta_height.get()
             r_prime = math.sqrt(x**2 + z**2)
             theta = math.degrees(math.atan(h_prime/r_prime))
+            # Thickness
+            p2 = points[i + nodes[0]] if i < total_pts - nodes[0] else points[i - nodes[0]]
+            adjacent_inner = p2[1]
+            x2, y2, z2 = pm.xform(adjacent_inner, query=True, worldSpace=True, translation=True)
+            dist = math.sqrt((x2 - x)**2 + (y2 - y)**2 + (z2 - z)**2)
+            loc_outer.translateX.set(dist * settings.thickness.get() * (1 + i * settings.thickness_growth.get()/total_pts))
+            
 
     setPhiLocators()
     pm.scriptJob(attributeChange=['settings.delta_height', setPhiLocators])
     pm.scriptJob(attributeChange=['settings.start_angle', setPhiLocators])
+    pm.scriptJob(attributeChange=['settings.thickness', setPhiLocators])
+    pm.scriptJob(attributeChange=['settings.thickness_growth', setPhiLocators])
 
     # Construct clusters
     clusters = []
@@ -200,41 +211,50 @@ def run():
         
         frame1 = i % p
         frame2 = (i + p/2) % p
+        #if i < p/2:
+        #    frame2 = 1
         
         #print "FRAME", i, frame1, frame2
         
-        petal1_1 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
-        petal1_2 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
-        petal1_3 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
+        #petal1_1 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
         
-        petal2_1 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
-        petal2_2 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
-        petal2_3 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
+        #petal1_1 = pm.instance(snapshots[frame1]['child'], name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
         
-        pm.parent(petal1_1, world=True)
-        pm.parent(petal1_2, world=True)
-        pm.parent(petal1_3, world=True)
+        #petal1_2 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
+        #petal1_3 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
         
-        pm.parent(petal2_1, world=True)
-        pm.parent(petal2_2, world=True)
-        pm.parent(petal2_3, world=True)
+        #petal2_1 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
+        #petal2_2 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
+        #petal2_3 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
         
-        petals = [petal1_1, petal1_2, petal1_3, petal2_1, petal2_2, petal2_3]
+        # comment out petal1_1 = ...instance/duplicate...
+        petal1_1 = snapshots[frame1]['child']
+        
+        #pm.parent(petal1_1, world=True)
+        #pm.parent(petal1_2, world=True)
+        #pm.parent(petal1_3, world=True)
+        
+        #pm.parent(petal2_1, world=True)
+        #pm.parent(petal2_2, world=True)
+        #pm.parent(petal2_3, world=True)
+        
+        #petals = [petal1_1, petal1_2, petal1_3, petal2_1, petal2_2, petal2_3]
+        petals = [petal1_1]#, petal2_1]
         pm.lattice(lattice['ffd'], e=True, g=petals, after=True)
         
-        petal1_2.rotateY.set(120)
-        petal1_3.rotateY.set(240)
+        #petal1_2.rotateY.set(120)
+        #petal1_3.rotateY.set(240)
         
-        petal2_2.rotateY.set(120)
-        petal2_3.rotateY.set(240)
+        #petal2_2.rotateY.set(120)
+        #petal2_3.rotateY.set(240)
         
-        pm.parent(petal1_1, group_geom)
-        pm.parent(petal1_2, group_geom)
-        pm.parent(petal1_3, group_geom)
+        #pm.parent(petal1_1, group_geom)
+        #pm.parent(petal1_2, group_geom)
+        #pm.parent(petal1_3, group_geom)
         
-        pm.parent(petal2_1, group_geom)
-        pm.parent(petal2_2, group_geom)
-        pm.parent(petal2_3, group_geom)
+        #pm.parent(petal2_1, group_geom)
+        #pm.parent(petal2_2, group_geom)
+        #pm.parent(petal2_3, group_geom)
         
         progress += 1
         pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Instancing Geometry...')
