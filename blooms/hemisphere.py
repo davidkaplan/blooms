@@ -1,28 +1,34 @@
 import math
 import pymel.core as pm
 
+# Hardcoded Values
+NEIGHBORS = [13, 21]
+RADIUS = 20
+NUM_NODES = 50
+# period of petal animation
+#p = n
 
-def run():
-    # Get Selected Objects
-    if not pm.ls(selection=True):
-        pm.error("No Object selected in the scene. Please select an object and try again.")
-    objs = pm.ls(selection=True, type='mesh', dag=True, allPaths=True, noIntermediate=True)
-    if not objs:
-        pm.error("No geometry object to operate on. Please select and try again.")
-    if len(objs) > 1:
-        pm.error("Please select only 1 object.")
-    seed = objs[0]
-    
-    # Get rid of display layers
+def deleteDisplayLayers():
     [pm.delete(l) for l in pm.ls(type='displayLayer')[:-1]]
-
-    # Hardcoded Values
-    nodes = [13, 21]
-    r = 20
-    n = 300
-    # period of petal animation
-    p = n
     
+def makeSnapShots(seed, n):
+    pm.progressWindow(title='Creating Bloom', progress=0, status='Snapshots', isInterruptable=True )
+    
+    pm.undoInfo(state=False)
+    group_snap = pm.group(empty=True, name='group_snapshots')
+    snapshots = []
+    for i in range(1, n+1):
+        geomVarGroup, motionTrail = pm.snapshot(seed, constructionHistory=True, startTime=i, endTime=i, update='always')
+        child = pm.listRelatives(geomVarGroup, children=True)[0]
+        snapshots.append({'child':child, 'geomVarGroup':geomVarGroup})
+        pm.parent(geomVarGroup, group_snap)
+        pm.progressWindow( edit=True, progress=100*i/n)
+    layerGeom = pm.createDisplayLayer(empty=True, name='Geometry').addMembers(group_snap)
+    pm.progressWindow(endProgress=True)
+    pm.undoInfo(state=True)
+    return snapshots, group_snap
+
+def makeLattices(n, r, nodes):
     #turn off history
     pm.undoInfo(state=False)
     
@@ -36,15 +42,6 @@ def run():
     pm.addAttr(settings, longName='start_height', defaultValue=0, attributeType='double')
     pm.expression(settings, s='%s = %d * tan(%s * %d/180)' % (settings.start_height, 1, settings.start_angle, math.pi))
 
-    # Make the snapshots
-    group_snap = pm.group(empty=True, name='group_snapshots')
-    snapshots = []
-    for i in range(1, p+1):
-        geomVarGroup, motionTrail = pm.snapshot(seed, constructionHistory=True, startTime=i, endTime=i, update='animCurve')
-        child = pm.listRelatives(geomVarGroup, children=True)[0]
-        snapshots.append({'child':child, 'geomVarGroup':geomVarGroup})
-        pm.parent(geomVarGroup, group_snap)
-
     # Group locators
     loc_group = pm.group(empty=True, name='group_locators')
 
@@ -53,7 +50,7 @@ def run():
 
     # Do loop
     progress = 0
-    pm.progressWindow(title='Creating Bloom', progress=progress, status='Creating Locators...', isInterruptable=True )
+    pm.progressWindow(title='Creating Bloom', progress=progress, status='Creating locators...', isInterruptable=True )
     progressTotal = 2*n + 2*(n - sum(nodes))
     try:
         for i in range(n):
@@ -87,10 +84,12 @@ def run():
 
             # Update progress
             progress += 1
-            pm.progressWindow( edit=True, progress=100*progress/progressTotal)
+            pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Creating locators...')
 
     except Exception, e:
         print 'Error', e
+        
+    layerLocators = pm.createDisplayLayer(empty=True, name='Locators').addMembers(loc_group)
 
     def setPhiLocators():
         theta = settings.start_angle.get()
@@ -199,83 +198,58 @@ def run():
 
         progress += 1
         pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Creating Lattices...')
-
-    group_geom = pm.group(empty=True, name='group_geom')
-    for i, lattice in enumerate(reversed(lattices)):
-        if pm.progressWindow( query=True, isCancelled=True ):
-            pm.undoInfo(state=True)
-            pm.progressWindow(endProgress=True)
-            break
-
-        loop_num = i/p
-        
-        frame1 = i % p
-        frame2 = (i + p/2) % p
-        #if i < p/2:
-        #    frame2 = 1
-        
-        #print "FRAME", i, frame1, frame2
-        
-        #petal1_1 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
-        
-        #petal1_1 = pm.instance(snapshots[frame1]['child'], name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
-        
-        #petal1_2 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
-        #petal1_3 = pm.duplicate(snapshots[frame1]['child'], inputConnections=True, name='petal1_lattice%i_frame%i_cycle%i' % (i, frame1, loop_num))[0]
-        
-        #petal2_1 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
-        #petal2_2 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
-        #petal2_3 = pm.duplicate(snapshots[frame2]['child'], inputConnections=True, name='petal2_lattice%i_frame%i_cycle%i' % (i, frame2, loop_num))[0]
-        
-        # comment out petal1_1 = ...instance/duplicate...
-        petal1_1 = snapshots[frame1]['child']
-        
-        #pm.parent(petal1_1, world=True)
-        #pm.parent(petal1_2, world=True)
-        #pm.parent(petal1_3, world=True)
-        
-        #pm.parent(petal2_1, world=True)
-        #pm.parent(petal2_2, world=True)
-        #pm.parent(petal2_3, world=True)
-        
-        #petals = [petal1_1, petal1_2, petal1_3, petal2_1, petal2_2, petal2_3]
-        petals = [petal1_1]#, petal2_1]
-        pm.lattice(lattice['ffd'], e=True, g=petals, after=True)
-        
-        #petal1_2.rotateY.set(120)
-        #petal1_3.rotateY.set(240)
-        
-        #petal2_2.rotateY.set(120)
-        #petal2_3.rotateY.set(240)
-        
-        #pm.parent(petal1_1, group_geom)
-        #pm.parent(petal1_2, group_geom)
-        #pm.parent(petal1_3, group_geom)
-        
-        #pm.parent(petal2_1, group_geom)
-        #pm.parent(petal2_2, group_geom)
-        #pm.parent(petal2_3, group_geom)
-        
-        progress += 1
-        pm.progressWindow( edit=True, progress=100*progress/progressTotal, status='Instancing Geometry...')
-
-    pm.progressWindow( edit=True, progress=99, status='Finishing Up...', )
-
-    # Display layers
-    layerGeom = pm.createDisplayLayer(empty=True, name='Geometry').addMembers(group_geom)
+    
     layerLattices = pm.createDisplayLayer(empty=True, name='Lattices').addMembers(group_lattices)
-    layerLocators = pm.createDisplayLayer(empty=True, name='Locators').addMembers(loc_group)
-
+    
     # Animate it
     pm.setKeyframe(loc_group, attribute='rotateY', time=0, value=0, inTangentType='linear', outTangentType='linear')
     pm.setKeyframe(loc_group, attribute='rotateY', time=1, value=137.647, inTangentType='linear', outTangentType='linear')
     pm.setInfinity(loc_group, attribute='rotateY', preInfinite='cycleRelative', postInfinite='cycleRelative')
     pm.playbackOptions(edit=True, animationEndTime='34')
-
-    pm.undoInfo(state=True)
-    pm.select(settings)
-
+    
+    setPhiLocators()
     pm.progressWindow(endProgress=True)
+    pm.undoInfo(state=True)
+    return lattices
+
+
+def instanceGeomToLattices(snapshots, lattices):
+    pm.undoInfo(state=False)
+    #group_geom = pm.group(empty=True, name='group_geom')
+    pm.progressWindow(title='Creating Bloom', progress=0, status='Instancing Geometry...', isInterruptable=True )
+    for i, lattice in enumerate(reversed(lattices)):
+        if pm.progressWindow( query=True, isCancelled=True ):
+            pm.undoInfo(state=True)
+            pm.progressWindow(endProgress=True)
+            break
+        pm.lattice(lattice['ffd'], e=True, g=snapshots[i]['child'], after=True)
+        pm.progressWindow( edit=True, progress=100*i/len(lattices), status='Instancing Geometry...')
+    pm.progressWindow(endProgress=True)
+    pm.undoInfo(state=True)
+        
+    
+def run():
+    # Get Selected Objects
+    if not pm.ls(selection=True):
+        pm.error("No Object selected in the scene. Please select an object and try again.")
+    objs = pm.ls(selection=True, type='mesh', dag=True, allPaths=True, noIntermediate=True)
+    if not objs:
+        pm.error("No geometry object to operate on. Please select and try again.")
+    if len(objs) > 1:
+        pm.error("Please select only 1 object.")
+    seed = objs[0]
+    
+    # Get rid of display layers
+    deleteDisplayLayers()
+    
+    # Make the snapshots
+    snapshots, group_snap = makeSnapShots(seed, NUM_NODES)
+
+    # Do the heavy lifting
+    lattices = makeLattices(NUM_NODES, RADIUS, NEIGHBORS)    
+
+    # Make the geom
+    instanceGeomToLattices(snapshots, lattices)
 
     print "Finished."
 
