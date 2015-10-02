@@ -34,7 +34,7 @@ def makeLattices(n, r, nodes):
     
     # Make Settings
     settings = pm.group(empty=True, name='settings', )
-    pm.addAttr(settings, longName='delta_height', defaultValue=0.2, minValue=0.05, maxValue=1)
+    pm.addAttr(settings, longName='delta_height', defaultValue=r/100.0, minValue=r/1000.0, maxValue=r/20.0)
     pm.addAttr(settings, longName='delta_theta', defaultValue=137.5, minValue=0, maxValue=360)
     pm.addAttr(settings, longName='thickness', defaultValue=1, minValue=0, maxValue=10)
     pm.addAttr(settings, longName='thickness_growth', defaultValue=0, minValue=-10, maxValue=10)
